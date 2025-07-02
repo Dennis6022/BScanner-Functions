@@ -1,32 +1,35 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+const { onCall } = require("firebase-functions/v2/https");
+const { logger } = require("firebase-functions");
+const { initializeApp } = require("firebase-admin/app");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+initializeApp();
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+// Initialisiere das KI-Modell mit dem API-Schlüssel aus den Secrets
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+exports.getBarcodeMeaning = onCall({ region: "europe-west1", secrets: ["GEMINI_API_KEY"] }, async (request) => {
+    const barcode = request.data.barcode;
+    if (!barcode) {
+        logger.error("Anfrage ohne Barcode erhalten.");
+        throw new Error("Fehler: Die Anfrage muss einen 'barcode'-Wert enthalten.");
+    }
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+    logger.info(`Anfrage für Barcode erhalten: ${barcode}`);
+
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
+    const prompt = `Was bedeutet der Barcode '${barcode}'? Wenn es ein Produktcode (wie EAN oder UPC) ist, beschreibe das Produkt und den Hersteller kurz. Antworte auf Deutsch.`;
+
+    try {
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
+
+        logger.info(`KI-Antwort erhalten: ${text}`);
+        return { result: text };
+
+    } catch (error) {
+        logger.error("Fehler bei der Gemini API:", error);
+        throw new Error("Fehler bei der Kommunikation mit der KI.");
+    }
+});
