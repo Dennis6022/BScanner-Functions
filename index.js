@@ -8,7 +8,7 @@ initializeApp();
 // Initialisiere das KI-Modell mit dem API-Schlüssel aus den Secrets
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-exports.getBarcodeMeaning = onCall({ region: "europe-west1", secrets: ["GEMINI_API_KEY"] }, async (request) => {
+exports.getBarcodeMeaning = onCall({ region: "europe-west1" }, async (request) => {
     const barcode = request.data.barcode;
     if (!barcode) {
         logger.error("Anfrage ohne Barcode erhalten.");
