@@ -1,3 +1,4 @@
+// Dies ist ein Test-Kommentar, um eine erneute Bereitstellung zu erzwingen.
 const { onCall } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
