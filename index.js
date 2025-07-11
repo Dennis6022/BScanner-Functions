@@ -7,9 +7,15 @@ const OpenAI = require("openai"); // Import der OpenAI Bibliothek
 initializeApp();
 
 // Initialisiere den OpenAI-Client mit dem API-Schlüssel, der als Umgebungsvariable übergeben wird.
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // Der API-Schlüssel wird aus den GitHub Secrets geladen.
-});
+let openai = null;
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+} else {
+  console.warn("⚠️ OPENAI_API_KEY ist nicht gesetzt – Funktion wird beim Deployment nicht ausgeführt.");
+}
+
 
 /**
  * Firebase Callable Cloud Function zum Abrufen der Bedeutung eines Barcodes.
