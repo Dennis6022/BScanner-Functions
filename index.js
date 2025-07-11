@@ -2,16 +2,10 @@
 const { onCall } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
-// Import der Google Generative AI Bibliothek auskommentiert, da wir jetzt OpenAI verwenden.
-// const { GoogleGenerativeAI } = require("@google/generative-ai"); 
 const OpenAI = require("openai"); // Import der OpenAI Bibliothek
 
-// Initialisiere die Firebase Admin SDK. Dies ist notwendig, um Firebase-Dienste zu nutzen.
 initializeApp();
 
-// Initialisiere das KI-Modell mit dem API-Schlüssel aus den Secrets.
-// Der Gemini-Initialisierungsaufruf ist auskommentiert.
-// const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Initialisiere den OpenAI-Client mit dem API-Schlüssel, der als Umgebungsvariable übergeben wird.
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // Der API-Schlüssel wird aus den GitHub Secrets geladen.
@@ -26,8 +20,9 @@ const openai = new OpenAI({
 exports.getBarcodeMeaning = onCall({ region: "europe-west1" }, async (request) => {
     // Extrahiere den Barcode aus den Anfragedaten.
     const barcode = request.data.barcode;
-    // Die Sprache wird nicht mehr explizit im Prompt angefragt, da die KI die Sprache erkennen soll.
-    // const language = request.data.language || "de"; // Diese Zeile wird nicht mehr direkt für den Prompt verwendet.
+    // Extrahiere die gewünschte Sprache aus den Anfragedaten.
+    // Wenn keine Sprache gesendet wird, wird standardmäßig 'de' (Deutsch) verwendet.
+    const language = request.data.language || "de"; 
 
     // Überprüfe, ob ein Barcode in der Anfrage enthalten ist.
     if (!barcode) {
@@ -36,8 +31,8 @@ exports.getBarcodeMeaning = onCall({ region: "europe-west1" }, async (request) =
         throw new Error("Fehler: Die Anfrage muss einen 'barcode'-Wert enthalten.");
     }
 
-    // Protokolliere die erhaltene Anfrage. Die Sprache wird nicht mehr explizit protokolliert, da sie nicht direkt vom Prompt beeinflusst wird.
-    logger.info(`Anfrage für Barcode erhalten: ${barcode}`);
+    // Protokolliere die erhaltene Anfrage für Debugging-Zwecke.
+    logger.info(`Anfrage für Barcode erhalten: ${barcode} in Sprache: ${language}`);
 
     try {
         // Der Prompt wird jetzt ohne explizite Sprachanweisung formuliert.
@@ -49,7 +44,8 @@ exports.getBarcodeMeaning = onCall({ region: "europe-west1" }, async (request) =
             model: "gpt-3.5-turbo", // Das verwendete OpenAI-Modell.
             messages: [
                 // System-Nachricht definiert die Rolle des Assistenten.
-                { role: "system", content: "Du bist ein hilfreicher Assistent, der Barcode-Informationen liefert. Antworte in der Sprache der Anfrage." }, // System-Prompt angepasst
+                // Hier ist der System-Prompt allgemeiner gehalten. Die KI wird die Sprache der Benutzeranfrage erkennen.
+                { role: "system", content: "Du bist ein hilfreicher Assistent, der Barcode-Informationen liefert." },
                 // Benutzer-Nachricht enthält die eigentliche Frage mit dem Barcode.
                 { role: "user", content: promptText }
             ],
