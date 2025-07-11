@@ -23,6 +23,22 @@ exports.getBarcodeMeaning = onCall(
     secrets: [openaiApiKey], // Secret wird bei Funktionsstart bereitgestellt
   },
   async (request) => {
+
+    // ================= START: TEMPORÄRER DIAGNOSE-BLOCK =================
+    try {
+      const key = openaiApiKey.value();
+      if (key && key.length > 20) {
+        logger.info(`API-Schlüssel erfolgreich geladen. Länge: ${key.length}. Startet mit: '${key.substring(0, 10)}'. Endet mit: '${key.substring(key.length - 4)}'.`);
+      } else {
+        logger.error("FATALER FEHLER: OpenAI API-Schlüssel konnte nicht aus den Secrets geladen werden oder ist zu kurz!");
+        throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
+      }
+    } catch (e) {
+      logger.error("FATALER FEHLER beim Zugriff auf das Secret: ", e);
+      throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
+    }
+    // ================== ENDE: TEMPORÄRER DIAGNOSE-BLOCK ==================
+
     // OpenAI-Client initialisieren zur Laufzeit mit Secret-Wert
     const openai = new OpenAI({
       apiKey: openaiApiKey.value(),
