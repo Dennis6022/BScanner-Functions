@@ -21,7 +21,6 @@ jobs:
         run: npm install
 
       - name: Deploy to Firebase
-        run: firebase deploy --only functions --token "${{ secrets.FIREBASE_TOKEN }}" --project b-scanner-57398
         env:
-
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: firebase deploy --only functions --token "${{ secrets.FIREBASE_TOKEN }}" --project b-scanner-57398
