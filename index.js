@@ -2,74 +2,72 @@
 const { onCall } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
-// Import der Google Generative AI Bibliothek auskommentiert
+// Import der Google Generative AI Bibliothek auskommentiert, da wir jetzt OpenAI verwenden.
 // const { GoogleGenerativeAI } = require("@google/generative-ai"); 
 const OpenAI = require("openai"); // Import der OpenAI Bibliothek
 
+// Initialisiere die Firebase Admin SDK. Dies ist notwendig, um Firebase-Dienste zu nutzen.
 initializeApp();
 
-// Initialisiere das KI-Modell mit dem API-Schlüssel aus den Secrets
-// Die Initialisierung für Google Generative AI ist auskommentiert
+// Initialisiere das KI-Modell mit dem API-Schlüssel aus den Secrets.
+// Der Gemini-Initialisierungsaufruf ist auskommentiert.
 // const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialisiere den OpenAI-Client mit dem API-Schlüssel, der als Umgebungsvariable übergeben wird.
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // Verwende den OpenAI API-Schlüssel
+  apiKey: process.env.OPENAI_API_KEY, // Der API-Schlüssel wird aus den GitHub Secrets geladen.
 });
 
+/**
+ * Firebase Callable Cloud Function zum Abrufen der Bedeutung eines Barcodes.
+ * Diese Funktion empfängt einen Barcode und eine gewünschte Sprache vom Client.
+ * Sie ruft dann die OpenAI API auf, um Informationen zum Barcode zu erhalten,
+ * und gibt die Antwort in der erkannten Sprache zurück.
+ */
 exports.getBarcodeMeaning = onCall({ region: "europe-west1" }, async (request) => {
+    // Extrahiere den Barcode aus den Anfragedaten.
     const barcode = request.data.barcode;
-    // Sprache vom Gerät abrufen; Standard ist Deutsch, wenn keine Sprache gesendet wird
-    const language = request.data.language || "de"; 
+    // Die Sprache wird nicht mehr explizit im Prompt angefragt, da die KI die Sprache erkennen soll.
+    // const language = request.data.language || "de"; // Diese Zeile wird nicht mehr direkt für den Prompt verwendet.
 
+    // Überprüfe, ob ein Barcode in der Anfrage enthalten ist.
     if (!barcode) {
         logger.error("Anfrage ohne Barcode erhalten.");
+        // Werfe einen Fehler, der an den Client zurückgegeben wird.
         throw new Error("Fehler: Die Anfrage muss einen 'barcode'-Wert enthalten.");
     }
 
-    logger.info(`Anfrage für Barcode erhalten: ${barcode} in Sprache: ${language}`);
+    // Protokolliere die erhaltene Anfrage. Die Sprache wird nicht mehr explizit protokolliert, da sie nicht direkt vom Prompt beeinflusst wird.
+    logger.info(`Anfrage für Barcode erhalten: ${barcode}`);
 
     try {
-        // Prompt anpassen, um die Antwort in der gewünschten Sprache anzufordern
-        let promptLanguageInstruction = '';
-        switch (language.toLowerCase()) {
-            case 'de':
-                promptLanguageInstruction = 'Antworte auf Deutsch.';
-                break;
-            case 'en':
-                promptLanguageInstruction = 'Answer in English.';
-                break;
-            case 'es':
-                promptLanguageInstruction = 'Responde en español.';
-                break;
-            case 'fr':
-                promptLanguageInstruction = 'Réponds en français.';
-                break;
-            case 'it':
-                promptLanguageInstruction = 'Rispondi in italiano.';
-                break;
-            default:
-                promptLanguageInstruction = 'Antworte auf Deutsch.'; // Fallback auf Deutsch
-        }
+        // Der Prompt wird jetzt ohne explizite Sprachanweisung formuliert.
+        // Die KI soll die Sprache aus dem Kontext des Prompts erkennen und entsprechend antworten.
+        const promptText = `Was bedeutet der Barcode '${barcode}'? Wenn es ein Produktcode (wie EAN oder UPC) ist, beschreibe das Produkt und den Hersteller kurz.`;
 
-        const promptText = `Was bedeutet der Barcode '${barcode}'? Wenn es ein Produktcode (wie EAN oder UPC) ist, beschreibe das Produkt und den Hersteller kurz. ${promptLanguageInstruction}`;
-
-        // Aufruf der OpenAI API für Chat Completions
+        // Rufe die OpenAI Chat Completions API auf.
         const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo", // Das verwendete Modell
+            model: "gpt-3.5-turbo", // Das verwendete OpenAI-Modell.
             messages: [
-                { role: "system", content: "Du bist ein hilfreicher Assistent, der Barcode-Informationen liefert." },
+                // System-Nachricht definiert die Rolle des Assistenten.
+                { role: "system", content: "Du bist ein hilfreicher Assistent, der Barcode-Informationen liefert. Antworte in der Sprache der Anfrage." }, // System-Prompt angepasst
+                // Benutzer-Nachricht enthält die eigentliche Frage mit dem Barcode.
                 { role: "user", content: promptText }
             ],
-            max_tokens: 150, // Begrenzung der Antwortlänge
+            max_tokens: 150, // Begrenzung der maximalen Länge der generierten Antwort.
         });
 
+        // Extrahiere den generierten Text aus der OpenAI-Antwort.
         const text = completion.choices[0].message.content;
 
+        // Protokolliere die von der KI erhaltene Antwort.
         logger.info(`KI-Antwort erhalten: ${text}`);
+        // Gebe das Ergebnis an den aufrufenden Client zurück.
         return { result: text };
 
     } catch (error) {
-        // Fehlerbehandlung für die OpenAI API
+        // Fange Fehler ab, die während der Kommunikation mit der OpenAI API auftreten.
         logger.error("Fehler bei der OpenAI API:", error);
+        // Werfe einen generischen Fehler an den Client zurück, um sensible API-Fehler zu verbergen.
         throw new Error("Fehler bei der Kommunikation mit der KI.");
     }
 });
