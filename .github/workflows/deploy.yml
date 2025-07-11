@@ -19,10 +19,12 @@ jobs:
 
       - name: Install Dependencies
         run: npm install
-        
+
       - name: Set secret for Firebase Functions
         run: firebase functions:secrets:set OPENAI_API_KEY --project b-scanner-57398 --force
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+      - name: Deploy to Firebase
+        run: firebase deploy --only functions --token "${{ secrets.FIREBASE_TOKEN }}" --project b-scanner-57398
