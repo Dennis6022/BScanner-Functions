@@ -40,8 +40,11 @@ exports.getBarcodeMeaning = onCall(
     // ================== ENDE: TEMPORÄRER DIAGNOSE-BLOCK ==================
 
     // OpenAI-Client initialisieren zur Laufzeit mit Secret-Wert
+    // HIER IST DIE ÄNDERUNG:
     const openai = new OpenAI({
       apiKey: openaiApiKey.value(),
+      maxRetries: 3,      // WICHTIG: Versucht bei Rate-Limit-Fehlern bis zu 3 Mal, die Anfrage erneut zu senden.
+      timeout: 20 * 1000, // Optional: Bricht die Anfrage nach 20 Sekunden ab, um Endlosschleifen zu verhindern.
     });
 
     const barcode = request.data.barcode;
@@ -72,7 +75,9 @@ exports.getBarcodeMeaning = onCall(
 
     } catch (error) {
       logger.error("Fehler bei der OpenAI API:", error);
-      throw new Error("Fehler bei der Kommunikation mit der KI.");
+      // Die Fehlermeldung wird jetzt spezifischer sein, falls alle Wiederholungsversuche fehlschlagen.
+      throw new Error("Fehler bei der Kommunikation mit der KI nach mehreren Versuchen.");
     }
   }
 );
+```
