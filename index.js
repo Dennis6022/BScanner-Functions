@@ -40,7 +40,6 @@ exports.getBarcodeMeaning = onCall(
     // ================== ENDE: TEMPORÄRER DIAGNOSE-BLOCK ==================
 
     // OpenAI-Client initialisieren zur Laufzeit mit Secret-Wert
-    // HIER IST DIE ÄNDERUNG:
     const openai = new OpenAI({
       apiKey: openaiApiKey.value(),
       maxRetries: 3,      // WICHTIG: Versucht bei Rate-Limit-Fehlern bis zu 3 Mal, die Anfrage erneut zu senden.
@@ -80,4 +79,3 @@ exports.getBarcodeMeaning = onCall(
     }
   }
 );
-```
