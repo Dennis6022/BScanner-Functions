@@ -24,8 +24,9 @@ exports.getBarcodeMeaning = onCall(
     
     // OpenAI-Client initialisieren
     const openai = new OpenAI({
-      apiKey: openaiApiKey.value(),
-      organization: openaiOrgId.value(),
+      // KORREKTUR: .trim() entfernt unsichtbare Leerzeichen oder Zeilenumbrüche vom Schlüssel.
+      apiKey: openaiApiKey.value().trim(),
+      organization: openaiOrgId.value().trim(),
     });
 
     const barcode = request.data.barcode;
