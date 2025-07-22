@@ -2,14 +2,15 @@ const { onCall } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
 const { defineSecret } = require("firebase-functions/params");
-const OpenAI = require("openai"); // OpenAI-Bibliothek importieren
+const OpenAI = require("openai");
+const axios = require("axios"); // Hinzugefügt für den Netzwerktest
 
 // Firebase initialisieren
 initializeApp();
 
 // 🔐 Secrets für den OpenAI API-Schlüssel und die Organisations-ID definieren
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
-const openaiOrgId = defineSecret("OPENAI_ORG_ID"); // NEU: Secret für die Org-ID
+const openaiOrgId = defineSecret("OPENAI_ORG_ID");
 
 /**
  * Firebase Callable Cloud Function, die OpenAI mit dem gpt-3.5-turbo Modell verwendet.
@@ -17,29 +18,25 @@ const openaiOrgId = defineSecret("OPENAI_ORG_ID"); // NEU: Secret für die Org-I
 exports.getBarcodeMeaning = onCall(
   {
     region: "europe-west1",
-    secrets: [openaiApiKey, openaiOrgId], // NEU: Beide Secrets für die Funktion verfügbar machen
+    secrets: [openaiApiKey, openaiOrgId],
   },
   async (request) => {
-    // ================= START: DIAGNOSE-BLOCK FÜR API-SCHLÜSSEL =================
+    
+    // ================= START: ALLGEMEINER NETZWERK-DIAGNOSE-BLOCK =================
     try {
-      const key = openaiApiKey.value();
-      if (key && key.length > 20) {
-        logger.info(`API-Schlüssel erfolgreich geladen. Länge: ${key.length}. Startet mit: '${key.substring(0, 4)}...'. Endet mit: '...${key.substring(key.length - 4)}'.`);
-      } else {
-        logger.error("FATALER FEHLER: OpenAI API-Schlüssel konnte nicht aus den Secrets geladen werden oder ist ungültig!");
-        throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
-      }
-    } catch (e) {
-      logger.error("FATALER FEHLER beim Zugriff auf das Secret-Objekt: ", e);
-      throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
+      logger.info("Teste allgemeine ausgehende Netzwerkverbindung zu https://www.google.com...");
+      await axios.get('https://www.google.com');
+      logger.info("Verbindung zu google.com erfolgreich. Allgemeine Netzwerkverbindung ist OK.");
+    } catch (networkError) {
+      logger.error("FATALER FEHLER: Verbindung zu google.com fehlgeschlagen. Ausgehender Netzwerkverkehr scheint blockiert zu sein.", networkError);
+      throw new Error("Netzwerk-Konnektivitätstest fehlgeschlagen. Ausgehender Traffic ist blockiert.");
     }
-    // ================== ENDE: DIAGNOSE-BLOCK FÜR API-SCHLÜSSEL ==================
-
+    // ================== ENDE: ALLGEMEINER NETZWERK-DIAGNOSE-BLOCK ==================
 
     // OpenAI-Client initialisieren
     const openai = new OpenAI({
       apiKey: openaiApiKey.value(),
-      organization: openaiOrgId.value(), // NEU: Organisations-ID explizit übergeben
+      organization: openaiOrgId.value(),
     });
 
     const barcode = request.data.barcode;
@@ -55,7 +52,6 @@ exports.getBarcodeMeaning = onCall(
     try {
       const promptText = `Was bedeutet der Barcode '${barcode}'? Wenn es ein Produktcode (wie EAN oder UPC) ist, beschreibe das Produkt und den Hersteller kurz. Antworte in der Sprache: ${language}.`;
 
-      // API-Aufruf an OpenAI mit dem korrekten Chat-Completions-Endpunkt
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         max_tokens: 200,
