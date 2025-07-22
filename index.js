@@ -17,7 +17,11 @@ const openaiOrgId = defineSecret("OPENAI_ORG_ID");
  */
 exports.getBarcodeMeaning = onCall(
   {
-    region: "europe-west1",
+    // LETZTER LÖSUNGSVERSUCH: Ändern der Region.
+    // Manchmal gibt es Netzwerkprobleme, die spezifisch für eine Region sind.
+    // Wir wechseln von europe-west1 zu us-central1, einer Hauptregion in den USA,
+    // um mögliche Routing-Probleme zur OpenAI-API zu umgehen.
+    region: "us-central1",
     secrets: [openaiApiKey, openaiOrgId],
   },
   async (request) => {
