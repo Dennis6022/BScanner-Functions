@@ -1,5 +1,7 @@
+# Name des Workflows
 name: Deploy to Firebase Functions
 
+# Löst den Workflow bei einem Push auf den 'main'-Branch aus
 on:
   push:
     branches:
@@ -9,16 +11,45 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Schritt 1: Code aus dem Repository holen
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Schritt 2: Node.js-Umgebung einrichten
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '20' # Node.js 20 ist eine stabile LTS-Version, die von Firebase Functions unterstützt wird
 
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
-
+      # Schritt 3: Abhängigkeiten des Projekts installieren
       - name: Install Dependencies
         run: npm install
 
+      # Schritt 4: Bei Google Cloud authentifizieren
+      # Dieser Schritt ist notwendig, um Befehle für Google Cloud auszuführen (z.B. Secrets verwalten)
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v2'
+        with:
+          # Sie müssen ein Secret in GitHub namens GCP_SERVICE_ACCOUNT_KEY erstellen
+          credentials_json: '${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}'
+
+      # Schritt 5: Secrets im Google Cloud Secret Manager erstellen/aktualisieren
+      # Dies ist der entscheidende Schritt, damit Ihre Funktion zur Laufzeit auf die Secrets zugreifen kann.
+      - name: Upsert Secrets to Google Cloud Secret Manager
+        run: |
+          # Setzt die Projekt-ID für die gcloud-Befehle
+          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
+
+          echo "Updating secret: OPENAI_API_KEY"
+          gcloud secrets versions add OPENAI_API_KEY --data-file=- <<< "${{ secrets.OPENAI_API_KEY }}" || \
+          gcloud secrets create OPENAI_API_KEY --data-file=- --replication-policy=automatic <<< "${{ secrets.OPENAI_API_KEY }}"
+          
+          echo "Updating secret: OPENAI_ORG_ID"
+          gcloud secrets versions add OPENAI_ORG_ID --data-file=- <<< "${{ secrets.OPENAI_ORG_ID }}" || \
+          gcloud secrets create OPENAI_ORG_ID --data-file=- --replication-policy=automatic <<< "${{ secrets.OPENAI_ORG_ID }}"
+
+      # Schritt 6: Funktion in Firebase bereitstellen
       - name: Deploy to Firebase
-        run: firebase deploy --only functions --force --token "${{ secrets.FIREBASE_TOKEN }}" --project b-scanner-57398
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only functions --force --token "${{ secrets.FIREBASE_TOKEN }}" --project "${{ secrets.GCP_PROJECT_ID }}"
