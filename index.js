@@ -3,7 +3,6 @@ const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
 const { defineSecret } = require("firebase-functions/params");
 const OpenAI = require("openai");
-const axios = require("axios"); // Hinzugefügt für den Netzwerktest
 
 // Firebase initialisieren
 initializeApp();
@@ -17,26 +16,12 @@ const openaiOrgId = defineSecret("OPENAI_ORG_ID");
  */
 exports.getBarcodeMeaning = onCall(
   {
-    // LETZTER LÖSUNGSVERSUCH: Ändern der Region.
-    // Manchmal gibt es Netzwerkprobleme, die spezifisch für eine Region sind.
-    // Wir wechseln von europe-west1 zu us-central1, einer Hauptregion in den USA,
-    // um mögliche Routing-Probleme zur OpenAI-API zu umgehen.
-    region: "us-central1",
+    // Die Region wird auf den ursprünglichen Wert zurückgesetzt.
+    region: "europe-west1",
     secrets: [openaiApiKey, openaiOrgId],
   },
   async (request) => {
     
-    // ================= START: ALLGEMEINER NETZWERK-DIAGNOSE-BLOCK =================
-    try {
-      logger.info("Teste allgemeine ausgehende Netzwerkverbindung zu https://www.google.com...");
-      await axios.get('https://www.google.com');
-      logger.info("Verbindung zu google.com erfolgreich. Allgemeine Netzwerkverbindung ist OK.");
-    } catch (networkError) {
-      logger.error("FATALER FEHLER: Verbindung zu google.com fehlgeschlagen. Ausgehender Netzwerkverkehr scheint blockiert zu sein.", networkError);
-      throw new Error("Netzwerk-Konnektivitätstest fehlgeschlagen. Ausgehender Traffic ist blockiert.");
-    }
-    // ================== ENDE: ALLGEMEINER NETZWERK-DIAGNOSE-BLOCK ==================
-
     // OpenAI-Client initialisieren
     const openai = new OpenAI({
       apiKey: openaiApiKey.value(),
