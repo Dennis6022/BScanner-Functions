@@ -7,8 +7,9 @@ const OpenAI = require("openai"); // OpenAI-Bibliothek importieren
 // Firebase initialisieren
 initializeApp();
 
-// 🔐 Secret für den OpenAI API-Schlüssel definieren
+// 🔐 Secrets für den OpenAI API-Schlüssel und die Organisations-ID definieren
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
+const openaiOrgId = defineSecret("OPENAI_ORG_ID"); // NEU: Secret für die Org-ID
 
 /**
  * Firebase Callable Cloud Function, die OpenAI mit dem gpt-3.5-turbo Modell verwendet.
@@ -16,18 +17,15 @@ const openaiApiKey = defineSecret("OPENAI_API_KEY");
 exports.getBarcodeMeaning = onCall(
   {
     region: "europe-west1",
-    secrets: [openaiApiKey], // Das OpenAI-Secret für die Funktion verfügbar machen
+    secrets: [openaiApiKey, openaiOrgId], // NEU: Beide Secrets für die Funktion verfügbar machen
   },
   async (request) => {
     // ================= START: DIAGNOSE-BLOCK FÜR API-SCHLÜSSEL =================
     try {
       const key = openaiApiKey.value();
       if (key && key.length > 20) {
-        // Loggt eine Bestätigung, dass der Schlüssel geladen wurde. Aus Sicherheitsgründen
-        // loggen wir niemals den ganzen Schlüssel, nur Teile davon.
         logger.info(`API-Schlüssel erfolgreich geladen. Länge: ${key.length}. Startet mit: '${key.substring(0, 4)}...'. Endet mit: '...${key.substring(key.length - 4)}'.`);
       } else {
-        // Dieser Fehler tritt auf, wenn das Secret nicht gesetzt oder leer ist.
         logger.error("FATALER FEHLER: OpenAI API-Schlüssel konnte nicht aus den Secrets geladen werden oder ist ungültig!");
         throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
       }
@@ -41,6 +39,7 @@ exports.getBarcodeMeaning = onCall(
     // OpenAI-Client initialisieren
     const openai = new OpenAI({
       apiKey: openaiApiKey.value(),
+      organization: openaiOrgId.value(), // NEU: Organisations-ID explizit übergeben
     });
 
     const barcode = request.data.barcode;
@@ -58,7 +57,6 @@ exports.getBarcodeMeaning = onCall(
 
       // API-Aufruf an OpenAI mit dem korrekten Chat-Completions-Endpunkt
       const completion = await openai.chat.completions.create({
-        // GEÄNDERT: Wir testen mit gpt-3.5-turbo als Alternative.
         model: "gpt-3.5-turbo",
         max_tokens: 200,
         messages: [
@@ -80,7 +78,6 @@ exports.getBarcodeMeaning = onCall(
 
     } catch (error) {
       logger.error("Fehler bei der Kommunikation mit der OpenAI API:", error);
-      // Dieser Fehler sollte jetzt nicht mehr auftreten, wenn der Schlüssel und das Guthaben korrekt sind.
       throw new Error("Die KI konnte nicht erreicht werden. Bitte versuchen Sie es später erneut.");
     }
   }
