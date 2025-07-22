@@ -30,17 +30,21 @@ exports.getBarcodeMeaning = onCall(
     });
 
     const barcode = request.data.barcode;
-    const language = request.data.language || "de";
+    // NEU: Die Gerätesprache aus der Anfrage auslesen.
+    // Ihre App muss diese als 'language' mitsenden (z.B. "en" für Englisch, "es" für Spanisch).
+    // Wenn keine Sprache gesendet wird, wird Englisch als sicherer Standard verwendet.
+    const deviceLanguage = request.data.language || "en";
 
     if (!barcode) {
       logger.error("Anfrage ohne Barcode erhalten.");
       throw new Error("Fehler: Die Anfrage muss einen 'barcode'-Wert enthalten.");
     }
 
-    logger.info(`Anfrage für Barcode ${barcode} an OpenAI wird gesendet...`);
+    logger.info(`Anfrage für Barcode ${barcode} erhalten. Gewünschte Sprache: ${deviceLanguage}`);
 
     try {
-      const promptText = `Was bedeutet der Barcode '${barcode}'? Wenn es ein Produktcode (wie EAN oder UPC) ist, beschreibe das Produkt und den Hersteller kurz. Antworte in der Sprache: ${language}.`;
+      // NEU: Der Prompt wurde angepasst, um die Sprache expliziter zu machen.
+      const promptText = `Gib eine kurze Beschreibung für den Barcode '${barcode}'. Wenn es ein Produktcode ist (z.B. EAN oder UPC), nenne das Produkt und den Hersteller. WICHTIG: Antworte ausschließlich in der folgenden Sprache: ${deviceLanguage}.`;
 
       const completion = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
