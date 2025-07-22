@@ -8,74 +8,75 @@ const OpenAI = require("openai");
 // Firebase initialisieren
 initializeApp();
 
-// 🔐 Secret definieren – muss über CLI oder GitHub Actions gesetzt sein
+// 🔐 Secret für den OpenAI API-Schlüssel definieren.
+// Dieser Wert muss in der Google Cloud Secret Manager Konsole gesetzt werden.
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
 /**
  * Firebase Callable Cloud Function zum Abrufen der Bedeutung eines Barcodes.
- * Diese Funktion empfängt einen Barcode und eine gewünschte Sprache vom Client.
- * Sie ruft dann die OpenAI API auf, um Informationen zum Barcode zu erhalten,
- * und gibt die Antwort in der erkannten Sprache zurück.
+ * Diese Funktion nutzt das gpt-4o-mini Modell für eine schnelle und kostengünstige Antwort.
  */
 exports.getBarcodeMeaning = onCall(
   {
-    region: "europe-west1",
-    secrets: [openaiApiKey], // Secret wird bei Funktionsstart bereitgestellt
+    region: "europe-west1", // Region für die Funktion
+    secrets: [openaiApiKey],   // Macht das Secret für die Funktion verfügbar
   },
   async (request) => {
-
-    // ================= START: TEMPORÄRER DIAGNOSE-BLOCK =================
-    try {
-      const key = openaiApiKey.value();
-      if (key && key.length > 20) {
-        logger.info(`API-Schlüssel erfolgreich geladen. Länge: ${key.length}. Startet mit: '${key.substring(0, 10)}'. Endet mit: '${key.substring(key.length - 4)}'.`);
-      } else {
-        logger.error("FATALER FEHLER: OpenAI API-Schlüssel konnte nicht aus den Secrets geladen werden oder ist zu kurz!");
-        throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
-      }
-    } catch (e) {
-      logger.error("FATALER FEHLER beim Zugriff auf das Secret: ", e);
-      throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
-    }
-    // ================== ENDE: TEMPORÄRER DIAGNOSE-BLOCK ==================
-
-    // OpenAI-Client initialisieren zur Laufzeit mit Secret-Wert
+    // OpenAI-Client initialisieren. Dies geschieht zur Laufzeit,
+    // damit der Wert des Secrets sicher geladen wird.
     const openai = new OpenAI({
       apiKey: openaiApiKey.value(),
-      maxRetries: 3,      // WICHTIG: Versucht bei Rate-Limit-Fehlern bis zu 3 Mal, die Anfrage erneut zu senden.
-      timeout: 20 * 1000, // Optional: Bricht die Anfrage nach 20 Sekunden ab, um Endlosschleifen zu verhindern.
+      maxRetries: 2,      // Versucht bei vorübergehenden Fehlern (wie Rate Limits) die Anfrage bis zu 2 Mal erneut.
+      timeout: 20 * 1000, // Bricht die Anfrage nach 20 Sekunden ab, um Endlosschleifen zu verhindern.
     });
 
+    // Daten aus der Client-Anfrage extrahieren
     const barcode = request.data.barcode;
-    const language = request.data.language || "de";
+    const language = request.data.language || "de"; // Standardmäßig Deutsch, falls keine Sprache angegeben
 
+    // Überprüfen, ob ein Barcode mitgesendet wurde
     if (!barcode) {
       logger.error("Anfrage ohne Barcode erhalten.");
+      // Wirft einen Fehler, der an den Client zurückgesendet wird.
       throw new Error("Fehler: Die Anfrage muss einen 'barcode'-Wert enthalten.");
     }
 
     logger.info(`Anfrage für Barcode erhalten: ${barcode} in Sprache: ${language}`);
 
     try {
-      const promptText = `Was bedeutet der Barcode '${barcode}'? Wenn es ein Produktcode (wie EAN oder UPC) ist, beschreibe das Produkt und den Hersteller kurz.`;
+      // Der Prompt, der an die KI gesendet wird.
+      const promptText = `Was bedeutet der Barcode '${barcode}'? Wenn es ein Produktcode (wie EAN oder UPC) ist, beschreibe das Produkt und den Hersteller kurz. Antworte in der Sprache: ${language}.`;
 
+      // API-Aufruf an OpenAI mit dem Chat-Completions-Endpunkt
       const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        // OPTIMIERT: gpt-4o-mini ist das beste Modell für Tier 1: schnell, intelligent und sehr günstig.
+        model: "gpt-4o-mini",
         messages: [
-          { role: "system", content: "Du bist ein hilfreicher Assistent, der Barcode-Informationen liefert." },
-          { role: "user", content: promptText }
+          {
+            role: "system",
+            content: "Du bist ein präziser und hilfreicher Assistent, der Barcode-Informationen in der vom Benutzer gewünschten Sprache liefert."
+          },
+          {
+            role: "user",
+            content: promptText
+          }
         ],
-        max_tokens: 150,
+        max_tokens: 200, // Leicht erhöhtes Token-Limit für detailliertere Antworten
       });
 
-      const text = completion.choices[0].message.content;
-      logger.info(`KI-Antwort erhalten: ${text}`);
+      // Die Textantwort aus dem ersten Choice-Objekt extrahieren
+      const text = completion.choices[0].message.content.trim();
+      logger.info(`KI-Antwort erfolgreich erhalten für Barcode: ${barcode}`);
+      
+      // Erfolgreiches Ergebnis an den Client zurückgeben
       return { result: text };
 
     } catch (error) {
-      logger.error("Fehler bei der OpenAI API:", error);
-      // Die Fehlermeldung wird jetzt spezifischer sein, falls alle Wiederholungsversuche fehlschlagen.
-      throw new Error("Fehler bei der Kommunikation mit der KI nach mehreren Versuchen.");
+      // Detailliertes Logging des Fehlers auf dem Server für die Fehlersuche
+      logger.error("Fehler bei der Kommunikation mit der OpenAI API:", error);
+      
+      // Eine allgemeine, aber klare Fehlermeldung an den Client zurückgeben
+      throw new Error("Die KI konnte nicht erreicht werden. Bitte versuchen Sie es später erneut.");
     }
   }
 );
