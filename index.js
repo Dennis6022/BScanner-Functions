@@ -11,7 +11,7 @@ initializeApp();
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
 /**
- * Firebase Callable Cloud Function, die OpenAI mit dem gpt-4o-mini Modell verwendet.
+ * Firebase Callable Cloud Function, die OpenAI mit dem gpt-3.5-turbo Modell verwendet.
  */
 exports.getBarcodeMeaning = onCall(
   {
@@ -19,6 +19,25 @@ exports.getBarcodeMeaning = onCall(
     secrets: [openaiApiKey], // Das OpenAI-Secret für die Funktion verfügbar machen
   },
   async (request) => {
+    // ================= START: DIAGNOSE-BLOCK FÜR API-SCHLÜSSEL =================
+    try {
+      const key = openaiApiKey.value();
+      if (key && key.length > 20) {
+        // Loggt eine Bestätigung, dass der Schlüssel geladen wurde. Aus Sicherheitsgründen
+        // loggen wir niemals den ganzen Schlüssel, nur Teile davon.
+        logger.info(`API-Schlüssel erfolgreich geladen. Länge: ${key.length}. Startet mit: '${key.substring(0, 4)}...'. Endet mit: '...${key.substring(key.length - 4)}'.`);
+      } else {
+        // Dieser Fehler tritt auf, wenn das Secret nicht gesetzt oder leer ist.
+        logger.error("FATALER FEHLER: OpenAI API-Schlüssel konnte nicht aus den Secrets geladen werden oder ist ungültig!");
+        throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
+      }
+    } catch (e) {
+      logger.error("FATALER FEHLER beim Zugriff auf das Secret-Objekt: ", e);
+      throw new Error("Interner Konfigurationsfehler des API-Schlüssels.");
+    }
+    // ================== ENDE: DIAGNOSE-BLOCK FÜR API-SCHLÜSSEL ==================
+
+
     // OpenAI-Client initialisieren
     const openai = new OpenAI({
       apiKey: openaiApiKey.value(),
@@ -39,8 +58,8 @@ exports.getBarcodeMeaning = onCall(
 
       // API-Aufruf an OpenAI mit dem korrekten Chat-Completions-Endpunkt
       const completion = await openai.chat.completions.create({
-        // gpt-4o-mini: Schnell, intelligent und sehr kostengünstig für Tier-1-Nutzer.
-        model: "gpt-4o-mini",
+        // GEÄNDERT: Wir testen mit gpt-3.5-turbo als Alternative.
+        model: "gpt-3.5-turbo",
         max_tokens: 200,
         messages: [
           {
