@@ -16,44 +16,42 @@ const openaiOrgId = defineSecret("OPENAI_ORG_ID");
  */
 exports.getBarcodeMeaning = onCall(
   {
-    // Die Region wird auf den ursprünglichen Wert zurückgesetzt.
     region: "europe-west1",
     secrets: [openaiApiKey, openaiOrgId],
   },
   async (request) => {
     
-    // OpenAI-Client initialisieren
     const openai = new OpenAI({
-      // KORREKTUR: .trim() entfernt unsichtbare Leerzeichen oder Zeilenumbrüche vom Schlüssel.
       apiKey: openaiApiKey.value().trim(),
       organization: openaiOrgId.value().trim(),
     });
 
+    // NEU: Zusätzliche Daten aus der Anfrage auslesen
     const barcode = request.data.barcode;
-    // NEU: Die Gerätesprache aus der Anfrage auslesen.
-    // Ihre App muss diese als 'language' mitsenden (z.B. "en" für Englisch, "es" für Spanisch).
-    // Wenn keine Sprache gesendet wird, wird Englisch als sicherer Standard verwendet.
+    const barcodeFormat = request.data.barcodeFormat; // z.B. "EAN_13", "QR_CODE"
+    const productTitle = request.data.productTitle; // Optionaler Titel, kann null sein
     const deviceLanguage = request.data.language || "en";
 
-    if (!barcode) {
-      logger.error("Anfrage ohne Barcode erhalten.");
-      throw new Error("Fehler: Die Anfrage muss einen 'barcode'-Wert enthalten.");
+    if (!barcode || !barcodeFormat) {
+      logger.error("Anfrage ohne Barcode oder Barcode-Format erhalten.");
+      throw new Error("Fehler: Die Anfrage muss 'barcode' und 'barcodeFormat' enthalten.");
     }
 
-    logger.info(`Anfrage für Barcode ${barcode} erhalten. Gewünschte Sprache: ${deviceLanguage}`);
+    logger.info(`Anfrage für Barcode ${barcode} (Format: ${barcodeFormat}) erhalten. Sprache: ${deviceLanguage}`);
 
     try {
-      // NEU: Der Prompt wurde angepasst, um die Sprache expliziter zu machen.
-      const promptText = `Gib eine kurze Beschreibung für den Barcode '${barcode}'. Wenn es ein Produktcode ist (z.B. EAN oder UPC), nenne das Produkt und den Hersteller. WICHTIG: Antworte ausschließlich in der folgenden Sprache: ${deviceLanguage}.`;
+      // NEU: Der Prompt ist jetzt viel detaillierter und intelligenter.
+      // Er verwendet das Barcode-Format und den optionalen Produkttitel.
+      const titleHint = productTitle ? ` Der bekannte Titel des Produkts ist "${productTitle}".` : '';
+      const promptText = `Gib eine kurze, präzise Beschreibung für den Barcode '${barcode}'. Der Typ des Barcodes ist '${barcodeFormat}'.${titleHint} Wenn es ein Produktcode ist (z.B. EAN oder UPC), beschreibe das Produkt und den Hersteller. Wenn es ein QR-Code ist, erkläre den Inhalt (z.B. URL, Text, Kontakt). WICHTIG: Antworte ausschließlich in der folgenden Sprache: ${deviceLanguage}.`;
 
       const completion = await openai.chat.completions.create({
-        // MODELL-UPGRADE: gpt-4o-mini ist intelligenter, schneller und kostengünstiger.
         model: "gpt-4o-mini",
-        max_tokens: 250, // Leicht erhöhtes Token-Limit für potenziell detailliertere Antworten
+        max_tokens: 250,
         messages: [
           {
             role: "system",
-            content: "Du bist ein präziser und hilfreicher Assistent, der Barcode-Informationen in der vom Benutzer gewünschten Sprache liefert."
+            content: "Du bist ein präziser und hilfreicher Assistent, der Barcode-Informationen basierend auf dem Wert, Typ und optionalen Produkttitel in der vom Benutzer gewünschten Sprache liefert."
           },
           {
             role: "user",
@@ -63,13 +61,4 @@ exports.getBarcodeMeaning = onCall(
       });
 
       const text = completion.choices[0].message.content.trim();
-      logger.info(`Antwort von OpenAI erfolgreich erhalten.`);
-      
-      return { result: text };
-
-    } catch (error) {
-      logger.error("Fehler bei der Kommunikation mit der OpenAI API:", error);
-      throw new Error("Die KI konnte nicht erreicht werden. Bitte versuchen Sie es später erneut.");
-    }
-  }
-);
+      logger.info(`Antwort von Ope
