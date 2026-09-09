@@ -28,7 +28,7 @@ const KNOWN_BARCODE_FORMATS = new Set([
 // Diese Werte sind bewusst konservative Sicherheitsnetze gegen Missbrauch/Bugs,
 // nicht gegen normale Nutzung gedacht - bei Bedarf an das OpenAI-Budget anpassen.
 const PER_MINUTE_LIMIT = 10; // pro Client (App-Instanz + IP)
-const PER_DAY_LIMIT_PER_CLIENT = 300;
+const PER_DAY_LIMIT_PER_CLIENT = 50;
 const GLOBAL_PER_DAY_LIMIT = 5000; // harte Obergrenze ueber alle Nutzer zusammen
 
 function hash(value) {
