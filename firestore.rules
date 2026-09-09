@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Diese Collections werden ausschließlich von der Cloud Function ueber das Admin SDK
+// gelesen/geschrieben (Rate-Limiting-Zaehler, AI-Antwort-Cache). Kein Client - egal ob
+// authentifiziert oder nicht - darf direkt darauf zugreifen, sonst könnte man die
+// Rate-Limits zurücksetzen oder den Cache vergiften.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

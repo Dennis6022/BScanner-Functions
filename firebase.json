@@ -1,5 +1,8 @@
 {
   "functions": {
     "source": "."
+  },
+  "firestore": {
+    "rules": "firestore.rules"
   }
 }
